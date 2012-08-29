@@ -12,7 +12,7 @@ REQUIRED_INTLTOOL_VERSION=0.35.5
 
 (test -f $srcdir/configure.ac \
   && test -f $srcdir/ChangeLog \
-  && test -d $srcdir/src/camel) || {
+  && test -d $srcdir/camel) || {
     echo -n "**Error**: Directory "\`$srcdir\'" does not look like the" >&2
     echo " top-level $PKG_NAME directory" >&2
     exit 1

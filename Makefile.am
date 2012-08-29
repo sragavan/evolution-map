@@ -1,7 +1,7 @@
 NULL =
 
-SUBDIRS = src po
-DIST_SUBDIRS= src po
+SUBDIRS = camel configuration po
+DIST_SUBDIRS= camel configuration po
 
 changelogs = \
 	ChangeLog \

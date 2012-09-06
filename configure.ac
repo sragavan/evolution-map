@@ -116,6 +116,11 @@ dnl Check for evolution-data-server
 dnl ********************************
 PKG_CHECK_MODULES(EVOLUTION_DATA_SERVER, evolution-data-server-1.2 >= eds_minimum_version)
 
+dnl ********************************
+dnl Check for Bluez
+dnl ********************************
+PKG_CHECK_MODULES(BLUEZ, bluez)
+
 
 dnl *****************************
 dnl Check for GNOME Platform
@@ -210,6 +215,7 @@ AC_CONFIG_FILES([
 Makefile 
 camel/Makefile
 configuration/Makefile
+utils/Makefile
 po/Makefile.in
 ])
 AC_OUTPUT

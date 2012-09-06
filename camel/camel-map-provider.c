@@ -1,5 +1,4 @@
 /* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
-/* camel-pop3-provider.c: pop3 provider registration code */
 /*
  * Authors :
  *   Srinivasa Ragavan <sragavan@gnome.org>
@@ -29,6 +28,8 @@
 #include <camel/camel.h>
 #include <glib/gi18n-lib.h>
 
+#include "camel-map-store.h"
+
 static guint map_url_hash (gconstpointer key);
 static gint  map_url_equal (gconstpointer a, gconstpointer b);
 
@@ -42,20 +43,14 @@ CamelProviderConfEntry map_conf_entries[] = {
 	  N_("Folders") },
 	{ CAMEL_PROVIDER_CONF_SECTION_END },
 	{ CAMEL_PROVIDER_CONF_SECTION_START, "general", NULL, N_("Options") },
-	{ CAMEL_PROVIDER_CONF_CHECKBOX, "filter-all", NULL,
-	  N_("Apply _filters to new messages in all folders"), "0" },
+//	{ CAMEL_PROVIDER_CONF_CHECKBOX, "filter-all", NULL,
+//	  N_("Apply _filters to new messages in all folders"), "0" },
 	{ CAMEL_PROVIDER_CONF_CHECKBOX, "filter-inbox", "!filter-all",
 	  N_("_Apply filters to new messages in Inbox on this server"), "1" },
 	{ CAMEL_PROVIDER_CONF_CHECKBOX, "stay-synchronized", NULL,
 	  N_("Automatically synchroni_ze remote mail locally"), "0" },
 	{ CAMEL_PROVIDER_CONF_SECTION_END },
 	{ CAMEL_PROVIDER_CONF_END }
-};
-
-CamelProviderPortEntry map_port_entries[] = {
-	{ 143, N_("Default IMAP port"), FALSE },
-	{ 993, N_("IMAP over SSL"), TRUE },
-	{ 0, NULL, 0 }
 };
 
 static CamelProvider map_provider = {
@@ -89,11 +84,10 @@ void camel_map_module_init (void);
 void
 camel_map_module_init (void)
 {
-	map_provider.object_types[CAMEL_PROVIDER_STORE] = camel_imapx_store_get_type ();
+	map_provider.object_types[CAMEL_PROVIDER_STORE] = camel_map_store_get_type ();
 	map_provider.url_hash = map_url_hash;
 	map_provider.url_equal = map_url_equal;
 //	map_provider.authtypes = camel_sasl_authtype_list (FALSE);
-//	map_provider.authtypes = g_list_prepend (map_provider.authtypes, &camel_map_password_authtype);
 	map_provider.translation_domain = GETTEXT_PACKAGE;
 
 	camel_provider_register (&map_provider);

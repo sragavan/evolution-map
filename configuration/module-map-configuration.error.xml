@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<error-list domain="ews">
+
+  <error type="warning" id="autodiscovery-error">
+    <_primary>Autodiscovery query failed.</_primary>
+    <_secondary>The reported error was &quot;{0}&quot;.</_secondary>
+  </error>
+
+</error-list>

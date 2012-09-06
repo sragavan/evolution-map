@@ -12,14 +12,19 @@ libcamelmap_la_CPPFLAGS = \
 	$(GNOME_INCLUDEDIR) 			\
 	$(LIBEBACKEND_CFLAGS) 			\
 	$(E_DATA_SERVER_CFLAGS) 		\
+	$(BLUEZ_CFLAGS)				\
 	-DG_LOG_DOMAIN=\"camel-map-provider\" 	\
 	$(NULL)
 	
 libcamelmap_la_SOURCES =			\
-	camel-map-provider.c
+	camel-map-provider.c			\
+	camel-map-store.c			\
+	camel-map-store-summary.c
 
 libcamelmap_la_LIBADD = \
+	$(top_srcdir)/utils/libmaputils.la	\
 	$(CAMEL_LIBS) 				\
+	$(BLUEZ_LIBS)				\
 	$(EVOLUTION_PLUGIN_LIBS) 		\
 	$(LIBEDATASERVER_LIBS) 			\
 	$(LIBEBACKEND_LIBS) 			\

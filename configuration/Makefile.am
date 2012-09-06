@@ -5,23 +5,24 @@ evo_module_LTLIBRARIES = module-map-configuration.la
 module_map_configuration_la_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	-I$(top_srcdir) \
-	-I$(top_srcdir)/src \
+	-I$(top_srcdir)/utils \
 	$(EVOLUTION_MAIL_CFLAGS) \
 	$(EVOLUTION_SHELL_CFLAGS) \
 	$(NULL)
 
-module_map_configuration_la_SOURCES = 
-#\
-#	module-map-configuration.c \
-#	e-mail-config-map-autodiscover.c \
-#	e-mail-config-map-autodiscover.h \
-#	e-mail-config-map-backend.c \
-#	e-mail-config-map-backend.h \
-#	$(NULL)
+module_map_configuration_la_SOURCES = 	\
+	module-map-configuration.c 	\
+	e-mail-config-map-backend.c 	\
+	e-mail-config-map-backend.h	\
+	e-mail-config-map-discovery.c	\
+	e-mail-config-map-discovery.h	\
+       $(NULL)	
+
 
 module_map_configuration_la_LIBADD = \
-	$(EVOLUTION_MAIL_LIBS) \
-	$(EVOLUTION_SHELL_LIBS) \
+	$(top_srcdir)/utils/libmaputils.la	\
+	$(EVOLUTION_MAIL_LIBS) 			\
+	$(EVOLUTION_SHELL_LIBS) 		\
 	$(NULL)
 
 module_map_configuration_la_LDFLAGS = \

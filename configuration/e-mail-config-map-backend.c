@@ -49,33 +49,6 @@ G_DEFINE_DYNAMIC_TYPE (
 	e_mail_config_map_backend,
 	E_TYPE_MAIL_CONFIG_SERVICE_BACKEND)
 
-static ESource *
-mail_config_map_backend_new_collection (EMailConfigServiceBackend *backend)
-{
-	EMailConfigServiceBackendClass *class;
-	ESourceBackend *extension;
-	ESource *source;
-	const gchar *extension_name;
-
-	/* This backend serves double duty.  One instance holds the
-	 * mail account source, another holds the mail transport source.
-	 * We can differentiate by examining the EMailConfigServicePage
-	 * the backend is associated with.  We return a new collection
-	 * for both the Receiving Page and Sending Page.  Although the
-	 * Sending Page instance ultimately gets discarded, it's still
-	 * needed to avoid creating an [Ews Backend] extension in the
-	 * mail transport source. */
-
-	class = E_MAIL_CONFIG_SERVICE_BACKEND_GET_CLASS (backend);
-
-	source = e_source_new (NULL, NULL, NULL);
-	extension_name = E_SOURCE_EXTENSION_MAIL_ACCOUNT;
-	extension = e_source_get_extension (source, extension_name);
-	e_source_backend_set_backend_name (extension, class->backend_name);
-
-	return source;
-}
-
 enum {
 	COLUMN_DEVICE_NAME,
 	COLUMN_DEVICE_ADDR,
@@ -540,7 +513,6 @@ e_mail_config_map_backend_class_init (EMailConfigMapBackendClass *class)
 
 	backend_class = E_MAIL_CONFIG_SERVICE_BACKEND_CLASS (class);
 	backend_class->backend_name = "map";
-	//backend_class->new_collection = mail_config_map_backend_new_collection;
 	backend_class->insert_widgets = mail_config_map_backend_insert_widgets;
 	backend_class->setup_defaults = mail_config_map_backend_setup_defaults;
 	backend_class->check_complete = mail_config_map_backend_check_complete;

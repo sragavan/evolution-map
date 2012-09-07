@@ -245,6 +245,8 @@ device_selection_changed (GtkTreeSelection *selection,
 		gtk_entry_set_text ((GtkEntry *)priv->hidden_device_name, provider->device_name);
 		gtk_entry_set_text ((GtkEntry *)priv->hidden_device_str_address, provider->str_address);
 		gtk_entry_set_text ((GtkEntry *)priv->hidden_channel, str);
+		printf("%s %s %s %s\n", provider->service_name, provider->device_name,
+				provider->str_address, str);
 		g_free (str);
 	}
 	
@@ -478,6 +480,7 @@ mail_config_map_backend_check_complete (EMailConfigServiceBackend *backend)
 	EMailConfigServicePage *page;
 	CamelSettings *settings;
 	CamelNetworkSettings *network_settings;
+	CamelMapSettings *map_settings;
 	const gchar *hosturl;
 	const gchar *user;
 	const char *device;
@@ -488,6 +491,9 @@ mail_config_map_backend_check_complete (EMailConfigServiceBackend *backend)
 	priv = E_MAIL_CONFIG_MAP_BACKEND_GET_PRIVATE (backend);	
 	page = e_mail_config_service_backend_get_page (backend);
 
+	settings = e_mail_config_service_backend_get_settings (backend);
+	map_settings = CAMEL_MAP_SETTINGS (settings);
+
 	/* This backend serves double duty.  One instance holds the
 	 * mail account source, another holds the mail transport source.
 	 * We can differentiate by examining the EMailConfigServicePage
@@ -497,9 +503,14 @@ mail_config_map_backend_check_complete (EMailConfigServiceBackend *backend)
 		return TRUE;
 
 	device = gtk_entry_get_text (priv->hidden_device_name);
-	if (device && *device)
+	if (device && *device) {
+		printf("COMPLETE %s %s %s %u\n",
+				camel_map_settings_get_device_name (map_settings),
+				camel_map_settings_get_service_name (map_settings),
+				camel_map_settings_get_device_str_address (map_settings),
+				camel_map_settings_get_channel (map_settings));
 		return TRUE;
-
+	}
 	return FALSE;
 }
 

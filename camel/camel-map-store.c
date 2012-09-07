@@ -38,6 +38,7 @@
 
 //#include "camel-map-folder.h"
 #include "camel-map-store.h"
+#include "camel-map-dbus-utils.h"
 #include "utils/camel-map-settings.h"
 //#include "camel-map-summary.h"
 //#include "camel-map-utils.h"
@@ -56,6 +57,10 @@
 #define FINFO_REFRESH_INTERVAL 60
 
 struct _CamelMapStorePrivate {
+	char *session_path;
+	GDBusProxy *session;
+	GDBusProxy *map;
+	GDBusConnection *connection;	
 	time_t last_refresh_time;
 	GMutex *get_finfo_lock;
 	GMutex *connection_lock;
@@ -167,6 +172,31 @@ map_update_folder_hierarchy (CamelMapStore *map_store,
 	g_free (sync_state);
 }
 
+static void
+transfer_complete (GDBusConnection *connection,
+		   const gchar *sender_name,
+		   const gchar *object_path,
+		   const gchar *interface_name,
+		   const gchar *signal_name,
+		   GVariant *parameters,
+		   gpointer user_data)
+{
+	printf("%s: complete", signal_name);
+}
+
+
+static void                
+transfer_error (GDBusConnection *connection,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *parameters,
+		gpointer user_data)
+{
+	printf("%s: error\n", signal_name);
+}
+
 static gboolean
 map_connect_sync (CamelService *service,
                   GCancellable *cancellable,
@@ -175,30 +205,95 @@ map_connect_sync (CamelService *service,
 	CamelMapStore *map_store;
 	CamelSession *session;
 	gboolean success;
-
-#if 0	
+	CamelSettings *settings;
+	CamelMapSettings *map_settings;
+	GVariant *ret;
+	
 	map_store = CAMEL_MAP_STORE (service);
 	session = camel_service_get_session (service);
 
-	if (camel_service_get_connection_status (service) == CAMEL_SERVICE_DISCONNECTED)
-		return FALSE;
-
-	connection = camel_map_store_ref_connection (map_store);
-	if (connection != NULL) {
-		g_object_unref (connection);
-		return TRUE;
+	if (map_store->priv->connection == NULL) {
+		map_store->priv->connection = camel_map_connect_dbus (cancellable, error);
 	}
 
-	/* Try running an operation that requires authentication
-	 * to make sure we have a valid password available. */
-	success = camel_session_authenticate_sync (
-		session, service, NULL, cancellable, error);
+	if (map_store->priv->connection == NULL)
+		return FALSE;
 
-	if (success)
-		camel_offline_store_set_online_sync (
-			CAMEL_OFFLINE_STORE (map_store),
-			TRUE, cancellable, NULL);
-#endif	
+	settings = camel_service_ref_settings (service);
+	map_settings = CAMEL_MAP_SETTINGS(settings);
+
+	map_store->priv->session_path = camel_map_connect_device_channel (map_store->priv->connection,
+					camel_map_settings_get_device_str_address (map_settings),
+					camel_map_settings_get_channel (map_settings),
+					cancellable,
+					error);
+	
+	if (!map_store->priv->session_path)
+		return FALSE;
+	
+	map_store->priv->session = g_dbus_proxy_new_sync (map_store->priv->connection,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.bluez.obex.client",
+					map_store->priv->session_path,
+					"org.bluez.obex.Session",
+					cancellable,
+					error);
+	map_store->priv->map = g_dbus_proxy_new_sync (map_store->priv->connection,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.bluez.obex.client",
+					map_store->priv->session_path,
+					"org.bluez.obex.MessageAccess",
+					cancellable,
+					error);
+
+	g_dbus_connection_signal_subscribe (map_store->priv->connection,
+			NULL,
+			"org.bluez.obex.Transfer",
+			"Complete",
+			map_store->priv->session_path,
+			NULL,
+			G_DBUS_SIGNAL_FLAGS_NONE,
+			transfer_complete,
+			NULL,
+			NULL);
+
+	g_dbus_connection_signal_subscribe (map_store->priv->connection,
+			NULL,
+			"org.bluez.obex.Transfer",
+			"Error",
+			map_store->priv->session_path,
+			NULL,
+			G_DBUS_SIGNAL_FLAGS_NONE,
+			transfer_error,
+			NULL,
+			NULL);
+
+	ret = camel_map_dbus_set_current_folder (map_store->priv->map,
+						 "telecom/msg",
+						 cancellable,
+						 error);
+	if (ret == NULL) {
+		printf("Set folder to telecom/msg failed\n");
+		return FALSE;
+	}
+
+	printf("SETFOLDER: %s\n", g_variant_print (ret, TRUE));
+
+	ret = camel_map_dbus_get_folder_listing (map_store->priv->map,
+						 cancellable,
+						 error);
+
+	if (ret == NULL) {
+		printf("Getfolderlist error\n");
+		return FALSE;
+	}
+	printf("GetFolderList: %s\n", g_variant_print (ret, TRUE));
+
+	camel_offline_store_set_online_sync (
+		CAMEL_OFFLINE_STORE (map_store),
+		TRUE, cancellable, NULL);
 
 	return success;
 }
@@ -211,6 +306,7 @@ map_disconnect_sync (CamelService *service,
 {
 	CamelMapStore *map_store = (CamelMapStore *) service;
 	CamelServiceClass *service_class;
+
 #if 0
 	g_mutex_lock (map_store->priv->connection_lock);
 
@@ -1214,6 +1310,7 @@ camel_map_store_init (CamelMapStore *map_store)
 	map_store->priv =
 		CAMEL_MAP_STORE_GET_PRIVATE (map_store);
 
+	map_store->priv->connection = NULL;
 	map_store->priv->last_refresh_time = time (NULL) - (FINFO_REFRESH_INTERVAL + 10);
 	map_store->priv->get_finfo_lock = g_mutex_new ();
 	map_store->priv->connection_lock = g_mutex_new ();

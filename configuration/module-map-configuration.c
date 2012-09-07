@@ -16,7 +16,6 @@
  *
  */
 
-#include "e-mail-config-map-autodiscover.h"
 #include "e-mail-config-map-backend.h"
 
 /* Module Entry Points */

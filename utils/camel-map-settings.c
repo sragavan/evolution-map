@@ -90,7 +90,7 @@ map_settings_set_property (GObject *object,
 			return;
 			
 		case PROP_SERVICE_NAME:
-			camel_map_settings_set_device_name(
+			camel_map_settings_set_service_name(
 				CAMEL_MAP_SETTINGS (object),
 				g_value_get_string (value));
 			return;			

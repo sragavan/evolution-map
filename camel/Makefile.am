@@ -19,7 +19,8 @@ libcamelmap_la_CPPFLAGS = \
 libcamelmap_la_SOURCES =			\
 	camel-map-provider.c			\
 	camel-map-store.c			\
-	camel-map-store-summary.c
+	camel-map-store-summary.c		\
+	camel-map-dbus-utils.c
 
 libcamelmap_la_LIBADD = \
 	$(top_srcdir)/utils/libmaputils.la	\

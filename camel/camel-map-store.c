@@ -33,10 +33,12 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <glib/gstdio.h>
 
 //#include "camel-map-folder.h"
+#include <camel/camel.h>
 #include "camel-map-store.h"
 #include "camel-map-dbus-utils.h"
 #include "utils/camel-map-settings.h"
@@ -211,6 +213,9 @@ map_connect_sync (CamelService *service,
 	
 	map_store = CAMEL_MAP_STORE (service);
 	session = camel_service_get_session (service);
+	
+	if (map_store->priv->session_path) /* Already connected */
+		return TRUE;
 
 	if (map_store->priv->connection == NULL) {
 		map_store->priv->connection = camel_map_connect_dbus (cancellable, error);
@@ -637,6 +642,97 @@ folder_info_from_store_summary (CamelMapStore *store,
 }
 
 
+static void
+create_folder_hierarchy (CamelStore *store,
+			 const char *parent,
+			 CamelFolderInfo **fiparent,
+			 GHashTable *table,
+			 GCancellable *cancellable,
+			 GError **error)
+{
+	GVariant *folders;
+	GVariant *child, *subchild, *tchild, *ret;
+	GVariantIter iter, subiter, titer;
+	CamelMapStore *map_store;
+	CamelFolderInfo *fi = NULL, *parent_fi;
+	
+	map_store = (CamelMapStore *) store;
+	parent_fi = (CamelFolderInfo *)*fiparent;
+
+	ret = camel_map_dbus_set_current_folder (map_store->priv->map,
+						 parent,
+						 cancellable,
+						 error);
+	if (ret == NULL) {
+		printf("Set folder to %s failed\n", parent);
+		return;
+	}
+
+	folders = camel_map_dbus_get_folder_listing (map_store->priv->map, 
+			cancellable, error);
+	if (folders == NULL) {
+		printf("Unable to get folder listing in: %s\n", parent);
+		return;
+	}
+
+	g_variant_iter_init (&iter, folders);
+	while ((child = g_variant_iter_next_value (&iter))) {
+		g_variant_iter_init (&subiter, child);
+		while ((subchild = g_variant_iter_next_value (&subiter))) {
+			g_variant_iter_init (&titer, subchild);		
+			while ((tchild = g_variant_iter_next_value (&titer))) {
+				gchar *name, *folder, *newfolder;
+				GVariant *value;
+				
+      				g_variant_get (tchild,
+       	        	                   "{sv}",
+	               	                   &name,
+					   &value);
+				folder = g_variant_get_string (value, NULL);
+
+				if (!folder || !*folder || strcmp (folder, "msg") == 0)
+					continue;
+				newfolder = g_strdup_printf("%s/%s", parent, folder);
+				g_hash_table_insert (table, newfolder, newfolder);
+				if (fi == NULL) {
+					/* First FI in this hierarchy */
+					fi = camel_folder_info_new ();
+					if (parent_fi == NULL) {
+						/* We are exploring the root dir */
+						*fiparent = fi;
+					} else {
+						/* Link upto the parent FI */
+						fi->parent = parent_fi;
+					}
+				} else {
+					CamelFolderInfo *info = camel_folder_info_new ();
+		
+					info->parent = parent_fi;
+					fi->next = info;
+					fi = info;
+				}
+
+				fi->full_name = g_strdup (newfolder+strlen("/telecom/msg/"));
+				if (!g_ascii_strcasecmp(fi->full_name, "inbox")) {
+					fi->display_name = g_strdup (_("Inbox"));
+					fi->flags = (fi->flags & ~CAMEL_FOLDER_TYPE_MASK) | CAMEL_FOLDER_TYPE_INBOX;
+					fi->flags |= CAMEL_FOLDER_SYSTEM;
+				} else
+					fi->display_name = g_strdup (folder);
+				/* Add the tree to store summary if not there already */
+				/* Parse the subtree now */
+				create_folder_hierarchy (store, newfolder, &fi, table, cancellable, error);
+			
+				g_free (name);
+				g_variant_unref (value);
+				g_variant_unref (tchild);
+		    	}
+			g_variant_unref (subchild);
+		}
+		g_variant_unref (child);
+	}
+}
+
 static CamelFolderInfo *
 map_get_folder_info_sync (CamelStore *store,
                           const gchar *top,
@@ -654,26 +750,29 @@ map_get_folder_info_sync (CamelStore *store,
 	gboolean includes_last_folder;
 	gboolean success;
 	GError *local_error = NULL;
-#if 0
-	if ((flags & CAMEL_STORE_FOLDER_INFO_SUBSCRIPTION_LIST) != 0) {
-		g_set_error_literal (
-			error, CAMEL_ERROR, CAMEL_ERROR_GENERIC,
-			_("Cannot list folders available for subscription of Exchange Web Services account, "
-			"use 'Subscribe to folder of other user' context menu option above the account node "
-			"in the folder tree instead."));
-		return NULL;
-	}
-
+	GHashTable *allfolders;
 	map_store = (CamelMapStore *) store;
 	priv = map_store->priv;
 
+	//return NULL;
 	g_mutex_lock (priv->get_finfo_lock);
+
+
 	if (!(camel_offline_store_get_online (CAMEL_OFFLINE_STORE (store))
 	      && camel_service_connect_sync ((CamelService *) store, cancellable, error))) {
 		g_mutex_unlock (priv->get_finfo_lock);
-		goto offline;
+
+		return NULL;
+		//goto offline;
 	}
 
+
+	/* Get the folder hierarchy from the phone */
+	allfolders = g_hash_table_new_full (g_str_hash, g_str_equal, g_free, NULL);
+	create_folder_hierarchy (store, "/telecom/msg", &fi, allfolders, cancellable, error);
+	g_mutex_unlock (priv->get_finfo_lock);
+
+#if 0
 	sync_state = camel_map_store_summary_get_string_val (map_store->summary, "sync_state", NULL);
 	if (!sync_state)
 		initial_setup = TRUE;

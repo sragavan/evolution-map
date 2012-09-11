@@ -81,7 +81,7 @@ camel_map_dbus_set_current_folder (GDBusProxy *object,
 			-1,
 			cancellable,
 			error);
-	
+
 	return ret;
 }
 

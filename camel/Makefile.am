@@ -20,7 +20,9 @@ libcamelmap_la_SOURCES =			\
 	camel-map-provider.c			\
 	camel-map-store.c			\
 	camel-map-store-summary.c		\
-	camel-map-dbus-utils.c
+	camel-map-dbus-utils.c			\
+	camel-map-summary.c			\
+	camel-map-folder.c
 
 libcamelmap_la_LIBADD = \
 	$(top_srcdir)/utils/libmaputils.la	\

@@ -18,7 +18,7 @@ camel_map_connect_dbus (GCancellable *cancellable,
 
 char *
 camel_map_connect_device_channel (GDBusConnection *connection, 
-				  char *device, 
+				  const char *device, 
 				  guint channel, 
 				  GCancellable *cancellable,
 				  GError **error)
@@ -43,7 +43,7 @@ camel_map_connect_device_channel (GDBusConnection *connection,
 	g_variant_builder_add (b, "s", device);
 	g_variant_builder_open (b, G_VARIANT_TYPE ("a{sv}"));
 	g_variant_builder_add (b, "{sv}", "Target", g_variant_new_string("map"));
-	g_variant_builder_add (b, "{sv}", "Channel", g_variant_new_string (str_channel));
+	g_variant_builder_add (b, "{sv}", "Channel", g_variant_new_byte ((guchar)channel));
 	g_variant_builder_close (b);
 	dict = g_variant_builder_end (b);
 	
@@ -59,6 +59,7 @@ camel_map_connect_device_channel (GDBusConnection *connection,
 		return NULL;
 
 	v = g_dbus_message_get_body (r);
+	printf("CreateSession: %s\n", g_variant_print (v, TRUE));
 	g_variant_get (v, "(o)", &path);
 
 	printf("Path: %s\n", path);
@@ -108,5 +109,34 @@ camel_map_dbus_get_folder_listing (GDBusProxy *object,
 
 	g_variant_builder_unref(b);
 
+	return ret;
+}
+
+GVariant *
+camel_map_dbus_get_message_listing (GDBusProxy *object,
+				    const char *folder_full_name,
+				    GCancellable *cancellable,
+				    GError **error)
+{
+	GVariant *ret, *v;
+	GVariantBuilder *b;
+
+	b = g_variant_builder_new (G_VARIANT_TYPE ("(sa{ss})"));
+	g_variant_builder_add  (b, "s", folder_full_name);
+	g_variant_builder_open (b, G_VARIANT_TYPE ("a{ss}"));	
+	g_variant_builder_close (b);	
+	v = g_variant_builder_end (b);
+
+	ret = g_dbus_proxy_call_sync (object,
+			"GetMessageListing",
+			v,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			cancellable,
+			error);
+
+	g_variant_builder_unref(b);
+	
+	//printf("*************** %s\n", g_variant_print(ret, TRUE));
 	return ret;
 }

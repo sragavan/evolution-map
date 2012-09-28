@@ -189,6 +189,33 @@ camel_map_folder_get_message_from_cache (CamelMapFolder *map_folder,
 	return msg;
 }
 
+static gboolean
+parse_xbt_message (const char *btmsg,
+		   const char *cache_file,
+		   GError **error)
+{
+	char *bt_message = NULL;
+	char *mime_message = NULL, *end;
+	gsize len;
+	
+	if (!g_file_get_contents (btmsg, &bt_message, &len, error))
+		return FALSE;
+
+//	mime_message = bt_message;
+//	mime_message = g_strstr_len (bt_message, -1, "BEGIN:MSG");
+//	mime_message += strlen ("BEGIN:MSG")+1;
+	end = g_strstr_len (bt_message, -1, "END:MSG");
+	*end = '\0';
+
+	if (!g_file_set_contents (cache_file, bt_message, -1, error)) {
+		g_free (bt_message);
+		return FALSE;
+	}
+	
+	g_free (bt_message);
+	
+	return TRUE;
+}
 
 static CamelMimeMessage *
 camel_map_folder_get_message (CamelFolder *folder,
@@ -210,16 +237,14 @@ camel_map_folder_get_message (CamelFolder *folder,
 	gboolean res;
 	gchar *mime_fname_new = NULL;
 	GError *local_error = NULL;
-#if 0
+	gchar *msg_id;
+	
 	map_store = (CamelMapStore *) camel_folder_get_parent_store (folder);
 	map_folder = (CamelMapFolder *) folder;
 	priv = map_folder->priv;
 
-	if (!camel_map_store_connected (map_store, error))
-		return NULL;
-
 	g_mutex_lock (priv->state_lock);
-
+	
 	/* If another thread is already fetching this message, wait for it */
 
 	/* FIXME: We might end up refetching a message anyway, if another
@@ -244,94 +269,18 @@ camel_map_folder_get_message (CamelFolder *folder,
 	g_hash_table_insert (priv->uid_eflags, (gchar *) uid, (gchar *) uid);
 	g_mutex_unlock (priv->state_lock);
 
-	cnc = camel_map_store_ref_connection (map_store);
+	camel_map_store_folder_lock (map_store);
+	
 	ids = g_slist_append (ids, (gchar *) uid);
 
 	mime_dir = g_build_filename (
 		camel_data_cache_get_path (map_folder->cache),
-		"mimecontent", NULL);
-
-	if (g_access (mime_dir, F_OK) == -1 &&
-	    g_mkdir_with_parents (mime_dir, 0700) == -1) {
-		g_set_error (
-			error, CAMEL_ERROR, CAMEL_ERROR_GENERIC,
-			_("Unable to create cache path"));
-		g_free (mime_dir);
-		goto exit;
-	}
-
-	res = e_map_connection_get_items_sync (
-		cnc, pri, ids, "IdOnly", "item:MimeContent",
-		TRUE, mime_dir,
-		&items,
-		(ESoapProgressFn) camel_operation_progress,
-		(gpointer) cancellable,
-		cancellable, &local_error);
-	g_free (mime_dir);
-
-	if (!res || !items) {
-		camel_map_store_maybe_disconnect (map_store, local_error);
-		g_propagate_error (error, local_error);
-		goto exit;
-	}
-
-	/* The mime_content actually contains the *filename*, due to the
-	 * streaming hack in ESoapMessage */
-	mime_content = e_map_item_get_mime_content (items->data);
-
-	/* Exchange returns random UID for associated calendar item, which has no way
-	 * to match with calendar components saved in calendar cache. So manually get
-	 * AssociatedCalendarItemId, replace the random UID with this ItemId,
-	 * And save updated message data to a new temp file */
-	if (e_map_item_get_item_type (items->data) == E_MAP_ITEM_TYPE_MEETING_REQUEST ||
-		e_map_item_get_item_type (items->data) == E_MAP_ITEM_TYPE_MEETING_CANCELLATION ||
-		e_map_item_get_item_type (items->data) == E_MAP_ITEM_TYPE_MEETING_MESSAGE ||
-		e_map_item_get_item_type (items->data) == E_MAP_ITEM_TYPE_MEETING_RESPONSE) {
-		GSList *items_req = NULL;
-		const MapId *calendar_item_accept_id;
-		gboolean is_calendar_UID = TRUE;
-
-		// Get AssociatedCalendarItemId with second get_items call
-		res = e_map_connection_get_items_sync (
-			cnc, pri, ids, "IdOnly",
-			"meeting:AssociatedCalendarItemId",
-			FALSE, NULL,
-			&items_req,
-			(ESoapProgressFn) camel_operation_progress,
-			(gpointer) cancellable,
-			cancellable, &local_error);
-		if (!res || (items_req && e_map_item_get_item_type (items_req->data) == E_MAP_ITEM_TYPE_ERROR)) {
-			if (items_req) {
-				g_object_unref (items_req->data);
-				g_slist_free (items_req);
-			}
-			if (local_error) {
-				camel_map_store_maybe_disconnect (map_store, local_error);
-				g_propagate_error (error, local_error);
-			}
-			goto exit;
-		}
-		calendar_item_accept_id = e_map_item_get_calendar_item_accept_id (items_req->data);
-		/*In case of non-exchange based meetings invites the calendar backend have to create the meeting*/
-		if (!calendar_item_accept_id) {
-			calendar_item_accept_id = e_map_item_get_id (items->data);
-			is_calendar_UID = FALSE;
-		}
-		mime_fname_new = map_update_mgtrequest_mime_calendar_itemid (mime_content, calendar_item_accept_id, is_calendar_UID, error);
-		if (mime_fname_new)
-			mime_content = (const gchar *) mime_fname_new;
-
-		if (items_req) {
-			g_object_unref (items_req->data);
-			g_slist_free (items_req);
-		}
-	}
+		"bt-message", NULL);
 
 	cache_file = map_data_cache_get_filename (
 		map_folder->cache, "cur", uid, error);
 	temp = g_strrstr (cache_file, "/");
 	dir = g_strndup (cache_file, temp - cache_file);
-
 	if (g_mkdir_with_parents (dir, 0700) == -1) {
 		g_set_error (
 			error, CAMEL_ERROR, CAMEL_ERROR_GENERIC,
@@ -340,20 +289,36 @@ camel_map_folder_get_message (CamelFolder *folder,
 		g_free (cache_file);
 		goto exit;
 	}
-	g_free (dir);
 
-	if (g_rename (mime_content, cache_file) != 0) {
-		g_set_error (
-			error, CAMEL_ERROR, CAMEL_ERROR_GENERIC,
-			_("Failed to move message cache file"));
-		g_free (cache_file);
+	msg_id = g_strdup_printf("%s/message%s", camel_map_store_get_map_session_path(map_store), uid);
+	
+	if (!camel_map_store_set_current_folder (map_store, map_folder->priv->map_dir, cancellable, error)) {
+		g_propagate_error (error, local_error);
 		goto exit;
 	}
-	g_free (cache_file);
+	printf("Objid: %s\n", msg_id);
+	
+	res = camel_map_dbus_get_message (map_folder->priv->map,
+					  msg_id,
+					  mime_dir,
+					  cancellable,
+					  &local_error);
+
+	if (!res) {
+		g_propagate_error (error, local_error);
+		goto exit;
+	}
+
+	if (!parse_xbt_message (mime_dir, cache_file, &local_error)) {
+		g_propagate_error (error, local_error);
+		goto exit;
+	}
 
 	message = camel_map_folder_get_message_from_cache (map_folder, uid, cancellable, error);
 
 exit:
+	camel_map_store_folder_unlock (map_store);
+	
 	g_mutex_lock (priv->state_lock);
 	g_hash_table_remove (priv->uid_eflags, uid);
 	g_mutex_unlock (priv->state_lock);
@@ -375,8 +340,7 @@ exit:
 
 	if (mime_fname_new)
 		g_free (mime_fname_new);
-	g_object_unref (cnc);
-#endif
+	
 	return message;
 }
 
@@ -934,11 +898,13 @@ map_refresh_info_sync (CamelFolder *folder,
 	if (local_error)
 		g_propagate_error (error, local_error);
 
+	camel_map_store_folder_unlock (map_store);
+
+	
 	g_mutex_lock (priv->state_lock);
 	priv->refreshing = FALSE;
 	g_mutex_unlock (priv->state_lock);
 
-	camel_map_store_folder_unlock (map_store);
 
 	return !local_error;
 }

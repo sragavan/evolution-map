@@ -23,6 +23,11 @@ GVariant *		camel_map_dbus_get_message_listing 	(GDBusProxy *object,
 								 const char *folder_path,
 								 GCancellable *cancellable,
 								 GError **error);
+gboolean		camel_map_dbus_get_message 		(GDBusProxy *object,
+								 const char *message_object_id,
+								 const char *file_name,
+								 GCancellable *cancellable,
+								 GError **error);
 
 
 

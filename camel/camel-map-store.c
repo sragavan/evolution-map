@@ -61,7 +61,7 @@
 
 #define CURRENT_FOLDER_LOCK() g_rec_mutex_lock(&map_store->priv->current_folder_lock);
 #define CURRENT_FOLDER_UNLOCK() g_rec_mutex_unlock(&map_store->priv->current_folder_lock);
-#define CURRENT_FOLDER(folder) g_free(map_store->priv->current_selected_folder); map_store->priv->current_selected_folder = g_strdup(folder);
+#define CURRENT_FOLDER(folder) g_free(map_store->priv->current_selected_folder); map_store->priv->current_selected_folder = g_strdup(folder); printf("Setting current folder to %s\n", folder);
 
 struct _CamelMapStorePrivate {
 	char *session_path;
@@ -417,7 +417,7 @@ create_folder_hierarchy (CamelStore *store,
 					   &value);
 				folder = (gchar *)g_variant_get_string (value, NULL);
 
-				if (!folder || !*folder || strcmp (folder, "msg") == 0)
+				if (!folder || !*folder || strcmp (folder, "msg") == 0 || strcmp (folder, "MSG") == 0)
 					continue;
 				newfolder = g_strdup_printf("%s/%s", parent, folder);
 				g_hash_table_insert (table, newfolder, newfolder);

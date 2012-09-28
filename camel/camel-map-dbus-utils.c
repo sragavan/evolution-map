@@ -67,6 +67,139 @@ camel_map_connect_device_channel (GDBusConnection *connection,
 	return path;
 }
 
+
+typedef struct _transfer_handler {
+    GMutex lock;
+    GCond cond;
+    gboolean complete;
+    gboolean error;
+    GVariant *result;
+}TransferHandler;
+
+static void
+transfer_on_signal (GDBusProxy  *proxy,
+		     const gchar *sender_name,
+		     const gchar *signal_name,
+		     GVariant    *parameters,
+		     gpointer     user_data)
+{
+    TransferHandler *handler = (TransferHandler *)user_data;
+    
+    printf("Signal:*****************************8 %s\n", signal_name);
+    printf("%s\n", g_variant_print (parameters, TRUE));
+
+    if (g_ascii_strcasecmp (signal_name, "error") == 0) {
+	handler->result = g_variant_ref (parameters);
+	handler->complete = TRUE;
+	handler->error = TRUE;
+	printf("Launching cond signal handler after error\n");
+	g_cond_signal (&handler->cond);
+    } else if (g_ascii_strcasecmp (signal_name, "complete") == 0) {
+	handler->result = g_variant_ref (parameters);
+	handler->complete = TRUE;
+	handler->error = FALSE;
+	printf("Launching cond signal handler after complete\n");
+	g_cond_signal (&handler->cond);
+    }
+}
+
+gboolean
+camel_map_dbus_get_message (GDBusProxy *object,
+			    const char *message_object_id,
+			    const char *file_name,
+			    GCancellable *cancellable,
+			    GError **error)
+{
+	GVariant *ret, *v;
+	GVariantBuilder *b;
+	GDBusProxy *message, *transfer;
+	TransferHandler *handler;
+	gint64 end_time;
+	gboolean success = FALSE;
+	
+	message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.bluez.obex.client",
+					message_object_id,
+					"org.bluez.obex.Message",
+					cancellable,
+					error);
+
+	if (!message)
+	    return FALSE;
+
+	b = g_variant_builder_new (G_VARIANT_TYPE ("(sb)"));
+	g_variant_builder_add (b, "s", file_name);
+	g_variant_builder_add (b, "b", TRUE);
+	v = g_variant_builder_end (b);
+	
+	ret = g_dbus_proxy_call_sync (message,
+			"Get",
+			v,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			cancellable,
+			error);
+	
+	
+	printf("*************** %s\n", ret ? g_variant_print(ret, TRUE) :((*error)->message));
+	g_object_unref (message);
+
+	/* Get the transfer object (oa{sv}) */
+	GVariant *prop, *item;
+	GVariantIter top_iter, messages_iter, message_iter, prop_iter;
+	char *transfer_obj;
+	
+	g_variant_iter_init (&top_iter, ret);
+	item = g_variant_iter_next_value (&top_iter);
+	g_variant_get (item, "(&o@a{sv})", &transfer_obj, &prop);
+	g_object_unref (prop);
+
+	transfer = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.bluez.obex.client",
+					transfer_obj,
+					"org.bluez.obex.Transfer",
+					cancellable,
+					error);
+
+	/* Co-ordinate with Transfer handler and return synchronously */
+	handler = g_new0 (TransferHandler, 1);
+	g_cond_init (&handler->cond);
+	g_mutex_init (&handler->lock);
+	handler->complete = FALSE;
+	handler->result = NULL;
+	
+	g_mutex_lock (&handler->lock);
+	/* We would kinda wait 2 mins */
+	end_time = g_get_monotonic_time () + 120 * G_TIME_SPAN_SECOND;
+	g_signal_connect (transfer,
+			  "g-signal",
+			  G_CALLBACK (transfer_on_signal),
+			  handler);
+
+	while (!handler->complete) {
+	    printf("going to wait\n");
+	    if (!g_cond_wait_until (&handler->cond, &handler->lock, end_time)) {
+		// timeout has passed.
+		g_mutex_unlock (&handler->lock);
+		break;
+	    }
+	}
+	printf("Awake\n");
+	g_mutex_clear (&handler->lock);
+	g_cond_clear (&handler->cond);
+	g_variant_unref (handler->result);
+	success = handler->error != TRUE;
+	g_free (handler);
+	
+	printf("&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&& %s\n", transfer_obj);
+	return success;
+
+}
+
 GVariant *
 camel_map_dbus_set_current_folder (GDBusProxy *object,
 				   const char *folder,

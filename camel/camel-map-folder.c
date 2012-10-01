@@ -1084,4 +1084,86 @@ camel_map_folder_init (CamelMapFolder *map_folder)
 	camel_folder_set_lock_async (folder, TRUE);
 }
 
+void
+camel_map_folder_mark_message_read (CamelMapFolder *map_folder,
+				    const char *uid,
+				    gboolean read)
+{
+	CamelMapFolderPrivate *priv;
+	CamelMapStore *map_store;
+	gboolean res;
+	GError *local_error = NULL;
+	gchar *msg_id;
+	
+	map_store = (CamelMapStore *) camel_folder_get_parent_store ((CamelFolder *)map_folder);
+
+	priv = map_folder->priv;
+
+
+	camel_map_store_folder_lock (map_store);
+	
+	msg_id = g_strdup_printf("%s/message%s", camel_map_store_get_map_session_path(map_store), uid);
+	
+	if (!camel_map_store_set_current_folder (map_store, map_folder->priv->map_dir, NULL, &local_error)) {
+		goto exit;
+	}
+	printf("Objid: %s\n", msg_id);
+	
+	res = camel_map_dbus_set_message_read (map_folder->priv->map,
+					       msg_id,
+					       read,
+					       NULL,
+					       &local_error);
+
+	if (local_error) {
+		goto exit;
+	}
+
+exit:
+	camel_map_store_folder_unlock (map_store);	
+
+	return;	
+}
+
+void
+camel_map_folder_mark_message_deleted (CamelMapFolder *map_folder,
+				       const char *uid,
+				       gboolean deleted)
+{
+	CamelMapFolderPrivate *priv;
+	CamelMapStore *map_store;
+	gboolean res;
+
+	GError *local_error = NULL;
+	gchar *msg_id;
+	
+	map_store = (CamelMapStore *) camel_folder_get_parent_store ((CamelFolder *)map_folder);
+
+	priv = map_folder->priv;
+
+
+	camel_map_store_folder_lock (map_store);
+	
+	msg_id = g_strdup_printf("%s/message%s", camel_map_store_get_map_session_path(map_store), uid);
+	
+	if (!camel_map_store_set_current_folder (map_store, map_folder->priv->map_dir, NULL, &local_error)) {
+		goto exit;
+	}
+	printf("Objid: %s\n", msg_id);
+	
+	res = camel_map_dbus_set_message_deleted (map_folder->priv->map,
+						  msg_id,
+						  deleted,
+						  NULL,
+						  &local_error);
+
+	if (local_error) {
+		goto exit;
+	}
+
+exit:
+	camel_map_store_folder_unlock (map_store);	
+
+	return;	
+}
 /** End **/

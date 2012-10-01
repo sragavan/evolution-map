@@ -200,6 +200,72 @@ camel_map_dbus_get_message (GDBusProxy *object,
 
 }
 
+
+gboolean
+camel_map_dbus_set_message_read (GDBusProxy *object,
+				 const char *msg_id,
+				 gboolean read,
+				 GCancellable *cancellable,
+				 GError **error)
+{
+    GVariant *ret;
+    GDBusProxy *message;
+
+    message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
+				     G_DBUS_PROXY_FLAGS_NONE,
+				     NULL,
+				     "org.bluez.obex.client",
+				     msg_id,
+				     "org.bluez.obex.Message",
+				     cancellable,
+				     error);
+    if (!message)
+	return FALSE;
+    
+    ret = g_dbus_proxy_call_sync (message,
+				  "MarkAsRead",
+				  g_variant_new ("(b)", read),
+				  G_DBUS_CALL_FLAGS_NONE,
+				  -1,
+				  cancellable,
+				  error);
+    
+    return ret != NULL;
+}
+
+gboolean
+camel_map_dbus_set_message_deleted (GDBusProxy *object,
+				    const char *msg_id,
+				    gboolean deleted,
+				    GCancellable *cancellable,
+				    GError **error)
+{
+    GVariant *ret;
+    GDBusProxy *message;
+
+    message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
+				     G_DBUS_PROXY_FLAGS_NONE,
+				     NULL,
+				     "org.bluez.obex.client",
+				     msg_id,
+				     "org.bluez.obex.Message",
+				     cancellable,
+				     error);
+    if (!message)
+	return FALSE;
+    
+    ret = g_dbus_proxy_call_sync (message,
+				  "MarkAsDeleted",
+				  g_variant_new ("(b)", deleted),
+				  G_DBUS_CALL_FLAGS_NONE,
+				  -1,
+				  cancellable,
+				  error);
+
+    return ret != NULL;
+}
+
+
 GVariant *
 camel_map_dbus_set_current_folder (GDBusProxy *object,
 				   const char *folder,
@@ -207,15 +273,15 @@ camel_map_dbus_set_current_folder (GDBusProxy *object,
 				   GError **error)
 {
 	GVariant *ret;
-
+	
 	ret = g_dbus_proxy_call_sync (object,
-			"SetFolder",
-			g_variant_new ("(s)", folder),
-			G_DBUS_CALL_FLAGS_NONE,
-			-1,
-			cancellable,
-			error);
-
+				      "SetFolder",
+				      g_variant_new ("(s)", folder),
+				      G_DBUS_CALL_FLAGS_NONE,
+				      -1,
+				      cancellable,
+				      error);
+	
 	return ret;
 }
 

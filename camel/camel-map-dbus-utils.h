@@ -29,6 +29,16 @@ gboolean		camel_map_dbus_get_message 		(GDBusProxy *object,
 								 GCancellable *cancellable,
 								 GError **error);
 
+gboolean		camel_map_dbus_set_message_read 	(GDBusProxy *object,
+								 const char *msg_id,
+								 gboolean read,
+								 GCancellable *cancellable,
+								 GError **error);
+gboolean		camel_map_dbus_set_message_deleted 	(GDBusProxy *object,
+								 const char *msg_id,
+								 gboolean read,
+								 GCancellable *cancellable,
+								 GError **error);
 
 
 #endif

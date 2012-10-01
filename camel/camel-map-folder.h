@@ -77,6 +77,14 @@ CamelFolder * 			camel_map_folder_new 	(CamelStore *store,
 							 const gchar *folder_name,
 							 GCancellable *cancellable,
 							 GError **error);
+void				camel_map_folder_mark_message_read 
+							(CamelMapFolder *map_folder,
+							 const char *uid,
+							 gboolean read);
+void				camel_map_folder_mark_message_deleted
+							(CamelMapFolder *map_folder,
+							 const char *uid,
+							 gboolean read);
 
 
 G_END_DECLS

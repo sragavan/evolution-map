@@ -248,6 +248,13 @@ map_info_set_flags (CamelMessageInfo *info,
                     guint32 flags,
                     guint32 set)
 {
+	if ((flags & CAMEL_MESSAGE_SEEN) != 0) {
+		/* Message is marked read/unread */
+		if ((((CamelMessageInfoBase *)info)->flags & CAMEL_MESSAGE_SEEN) != (set & CAMEL_MESSAGE_SEEN)) {
+			printf("Marking message read: %s\n", info->uid);
+			camel_map_folder_mark_message_read ((CamelMapFolder *)camel_folder_summary_get_folder(info->summary), info->uid, (set & CAMEL_MESSAGE_SEEN) != 0);
+		}
+	}
 	return CAMEL_FOLDER_SUMMARY_CLASS (camel_map_summary_parent_class)->info_set_flags (info, flags, set);
 }
 

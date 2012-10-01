@@ -293,13 +293,13 @@ camel_map_dbus_get_folder_listing (GDBusProxy *object,
 	GVariant *ret, *v;
 	GVariantBuilder *b;
 
-	b = g_variant_builder_new (G_VARIANT_TYPE ("(a{ss})"));
-	g_variant_builder_open (b, G_VARIANT_TYPE ("a{ss}"));	
+	b = g_variant_builder_new (G_VARIANT_TYPE ("(a{sv})"));
+	g_variant_builder_open (b, G_VARIANT_TYPE ("a{sv}"));	
 	g_variant_builder_close (b);	
 	v = g_variant_builder_end (b);
 	
 	ret = g_dbus_proxy_call_sync (object,
-			"GetFolderListing",
+			"ListFolders",
 			v,
 			G_DBUS_CALL_FLAGS_NONE,
 			-1,
@@ -320,14 +320,14 @@ camel_map_dbus_get_message_listing (GDBusProxy *object,
 	GVariant *ret, *v;
 	GVariantBuilder *b;
 
-	b = g_variant_builder_new (G_VARIANT_TYPE ("(sa{ss})"));
+	b = g_variant_builder_new (G_VARIANT_TYPE ("(sa{sv})"));
 	g_variant_builder_add  (b, "s", folder_full_name);
-	g_variant_builder_open (b, G_VARIANT_TYPE ("a{ss}"));	
+	g_variant_builder_open (b, G_VARIANT_TYPE ("a{sv}"));	
 	g_variant_builder_close (b);	
 	v = g_variant_builder_end (b);
 
 	ret = g_dbus_proxy_call_sync (object,
-			"GetMessageListing",
+			"ListMessages",
 			v,
 			G_DBUS_CALL_FLAGS_NONE,
 			-1,

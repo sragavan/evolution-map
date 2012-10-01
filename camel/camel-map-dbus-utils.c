@@ -273,7 +273,8 @@ camel_map_dbus_set_current_folder (GDBusProxy *object,
 				   GError **error)
 {
 	GVariant *ret;
-	
+
+	printf("Set current folder to : %s\n", folder);
 	ret = g_dbus_proxy_call_sync (object,
 				      "SetFolder",
 				      g_variant_new ("(s)", folder),
@@ -336,6 +337,6 @@ camel_map_dbus_get_message_listing (GDBusProxy *object,
 
 	g_variant_builder_unref(b);
 	
-	//printf("*************** %s\n", g_variant_print(ret, TRUE));
+	//printf("*************** %s\n", ret ? g_variant_print(ret, TRUE) : "Empty");
 	return ret;
 }

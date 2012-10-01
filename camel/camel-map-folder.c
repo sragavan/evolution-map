@@ -633,6 +633,9 @@ map_refresh_info_sync (CamelFolder *folder,
 	camel_map_store_folder_lock (map_store);
 	if (!camel_map_store_set_current_folder (map_store, "/telecom/msg", cancellable, error)) {
 		camel_map_store_folder_unlock (map_store);
+		g_mutex_lock (priv->state_lock);
+		priv->refreshing = FALSE;
+		g_mutex_unlock (priv->state_lock);
 
 		return FALSE;
 	}
@@ -644,9 +647,13 @@ map_refresh_info_sync (CamelFolder *folder,
 			cancellable,
 			&local_error);
 	if (ret == NULL || local_error) {
-		printf("Unable to refresh folder\n");
+		printf("Unable to refresh folder: %s\n", local_error ? local_error->message : "Empty error msg");
 		g_propagate_error (error, local_error);
 		camel_map_store_folder_unlock (map_store);
+		g_mutex_lock (priv->state_lock);
+		priv->refreshing = FALSE;
+		g_mutex_unlock (priv->state_lock);
+
 		return FALSE;
 	}
 

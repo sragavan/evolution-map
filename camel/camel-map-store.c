@@ -756,10 +756,15 @@ camel_map_store_set_current_folder (CamelMapStore *map_store,
 	GVariant *ret;
 	/* Its a recurring lock, so no harm locking it again. */
 	CURRENT_FOLDER_LOCK();
-	if (g_strcmp0(map_store->priv->current_selected_folder, folder) == 0) {
+
+	/* It appears that we have to forcefully set the current folder for certain ops to work,
+	   even though we are in the same folder. */
+        /*
+	if (0 && g_strcmp0(map_store->priv->current_selected_folder, folder) == 0) {
 		CURRENT_FOLDER_UNLOCK();
 		return TRUE;
-	}
+		}
+	*/
 
 	ret = camel_map_dbus_set_current_folder (map_store->priv->map,
 						 folder,

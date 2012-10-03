@@ -116,6 +116,9 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	TransferHandler *handler;
 	gint64 end_time;
 	gboolean success = FALSE;
+	GVariant *prop, *item;
+	GVariantIter top_iter;
+	char *transfer_obj;
 	
 	message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
 					G_DBUS_PROXY_FLAGS_NONE,
@@ -147,9 +150,6 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	g_object_unref (message);
 
 	/* Get the transfer object (oa{sv}) */
-	GVariant *prop, *item;
-	GVariantIter top_iter, messages_iter, message_iter, prop_iter;
-	char *transfer_obj;
 	
 	g_variant_iter_init (&top_iter, ret);
 	item = g_variant_iter_next_value (&top_iter);
@@ -210,7 +210,8 @@ camel_map_dbus_set_message_read (GDBusProxy *object,
 {
     GVariant *ret;
     GDBusProxy *message;
-
+    GError *lerr = NULL;
+    
     message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
 				     G_DBUS_PROXY_FLAGS_NONE,
 				     NULL,
@@ -218,18 +219,21 @@ camel_map_dbus_set_message_read (GDBusProxy *object,
 				     msg_id,
 				     "org.bluez.obex.Message",
 				     cancellable,
-				     error);
-    if (!message)
+				     &lerr);
+    if (!message) {
+	printf("ERROR: %s\n", lerr->message);
 	return FALSE;
+    }
     
+    printf("Setprop \n");
     ret = g_dbus_proxy_call_sync (message,
-				  "MarkAsRead",
-				  g_variant_new ("(b)", read),
+				  "SetProperty",
+				  g_variant_new ("(sv)", "Read", g_variant_new_boolean(read)),
 				  G_DBUS_CALL_FLAGS_NONE,
 				  -1,
 				  cancellable,
 				  error);
-    
+
     return ret != NULL;
 }
 
@@ -255,8 +259,8 @@ camel_map_dbus_set_message_deleted (GDBusProxy *object,
 	return FALSE;
     
     ret = g_dbus_proxy_call_sync (message,
-				  "MarkAsDeleted",
-				  g_variant_new ("(b)", deleted),
+				  "SetProperty",
+				  g_variant_new ("(sv)", "Deleted", g_variant_new_boolean(deleted)),
 				  G_DBUS_CALL_FLAGS_NONE,
 				  -1,
 				  cancellable,

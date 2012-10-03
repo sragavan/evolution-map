@@ -143,6 +143,83 @@ map_data_cache_get_filename (CamelDataCache *cdc,
 	return filename;
 }
 
+static gboolean
+map_folder_delete_messages (CamelFolder *folder,
+			    GCancellable *cancellable,
+			    GError **error)
+{
+	CamelMapFolder *map_folder;
+	CamelMapStore *map_store;
+	int i;
+	GPtrArray *known_uids;
+	CamelMessageInfo *info;
+	CamelFolderChangeInfo *changes;
+	
+	map_store = (CamelMapStore *) camel_folder_get_parent_store (folder);
+	map_folder = (CamelMapFolder *) folder;
+
+	camel_folder_summary_prepare_fetch_all (folder->summary, NULL);
+	known_uids = camel_folder_summary_get_array (folder->summary);
+	if (!known_uids)
+		return TRUE;
+
+	changes = camel_folder_change_info_new ();
+	
+	camel_map_store_folder_lock (map_store);
+	
+	/* Collect UIDs of deleted messages. */
+	for (i = 0; i < known_uids->len; i++) {
+		const gchar *uid = g_ptr_array_index (known_uids, i);
+		
+		info = camel_folder_summary_get (folder->summary, uid);
+		if ((((CamelMessageInfoBase *)info)->flags & CAMEL_MESSAGE_DELETED) != 0) {
+			gboolean success;
+			char *msg_id;
+			
+			msg_id = g_strdup_printf("%s/message%s", camel_map_store_get_map_session_path(map_store), uid);
+
+			success = camel_map_dbus_set_message_deleted (map_folder->priv->map,
+								      msg_id,
+								      TRUE,
+								      cancellable,
+								      error);
+
+			if (!success || (error && *error)) {
+				/* Return safely */
+				camel_map_store_folder_unlock (map_store);
+				camel_message_info_free (info);
+				camel_folder_summary_free_array (known_uids);
+				if (camel_folder_change_info_changed (changes)) {
+					camel_folder_summary_touch (folder->summary);
+					camel_folder_changed (folder, changes);
+				}
+				camel_folder_change_info_free (changes);
+				
+				return FALSE;
+			}
+			camel_folder_summary_lock (folder->summary, CAMEL_FOLDER_SUMMARY_SUMMARY_LOCK);
+			camel_folder_change_info_remove_uid (changes, uid);
+			camel_folder_summary_remove_uid (folder->summary, uid);
+			map_data_cache_remove (map_folder->cache, "cur", uid, NULL);
+			camel_folder_summary_unlock (folder->summary, CAMEL_FOLDER_SUMMARY_SUMMARY_LOCK);
+			
+								      
+		}
+		
+		camel_message_info_free (info);
+	}
+	
+	camel_map_store_folder_unlock (map_store);
+	if (camel_folder_change_info_changed (changes)) {
+		camel_folder_summary_touch (folder->summary);
+		camel_folder_changed (folder, changes);
+	}
+	camel_folder_change_info_free (changes);
+	
+	
+	return TRUE;
+}
+
 static CamelMimeMessage *
 camel_map_folder_get_message_from_cache (CamelMapFolder *map_folder,
                                          const gchar *uid,
@@ -201,6 +278,8 @@ parse_xbt_message (const char *btmsg,
 	if (!g_file_get_contents (btmsg, &bt_message, &len, error))
 		return FALSE;
 
+	/* Handle separately for SMS, MMS & EMail */
+	
 //	mime_message = bt_message;
 //	mime_message = g_strstr_len (bt_message, -1, "BEGIN:MSG");
 //	mime_message += strlen ("BEGIN:MSG")+1;
@@ -226,7 +305,6 @@ camel_map_folder_get_message (CamelFolder *folder,
 	CamelMapFolder *map_folder;
 	CamelMapFolderPrivate *priv;
 	CamelMapStore *map_store;
-	const gchar *mime_content;
 	CamelMimeMessage *message = NULL;
 	CamelStream *tmp_stream = NULL;
 	GSList *ids = NULL, *items = NULL;
@@ -468,8 +546,9 @@ map_synchronize_sync (CamelFolder *folder,
                       GCancellable *cancellable,
                       GError **error)
 {
-	CamelMapStore *map_store;
-
+	if (expunge)
+		return map_folder_delete_messages (folder, cancellable, error);
+	
 	return TRUE;
 }
 
@@ -956,12 +1035,7 @@ map_expunge_sync (CamelFolder *folder,
                   GError **error)
 {
 
-	g_set_error (
-		error, CAMEL_ERROR, CAMEL_ERROR_GENERIC,
-		_("Cannot expunge folder '%s'. MAP doesn't support"),
-		camel_folder_get_full_name (folder));
-
-	return FALSE;
+	return map_folder_delete_messages (folder, cancellable, error);
 }
 
 static gint

@@ -344,3 +344,44 @@ camel_map_dbus_get_message_listing (GDBusProxy *object,
 	//printf("*************** %s\n", ret ? g_variant_print(ret, TRUE) : "Empty");
 	return ret;
 }
+
+gboolean
+camel_map_dbus_update_inbox (GDBusProxy *object,
+			     GCancellable *cancellable,
+			     GError **error)
+{
+    GVariant *ret;
+
+    ret = g_dbus_proxy_call_sync (object,
+				  "UpdateInbox",
+				  NULL,
+				  G_DBUS_CALL_FLAGS_NONE,
+				  -1,
+				  cancellable,
+				  error);
+
+    return ret != NULL;
+}
+			     
+gboolean
+camel_map_dbus_set_notification_registration (GDBusProxy *object,
+					      gboolean reg,
+					      GCancellable *cancellable,
+					      GError **error)
+{
+	GVariant *ret;
+
+	ret = g_dbus_proxy_call_sync (object,
+				      "SetNotificationRegistration",
+				      g_variant_new ("(b)", reg),
+				      G_DBUS_CALL_FLAGS_NONE,
+				      -1,
+				      cancellable,
+				      error);
+	
+	printf("REGISTRATION: %d: %d", reg, ret != NULL);
+    	return ret != NULL;
+
+}
+
+

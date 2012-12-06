@@ -82,7 +82,9 @@ const char *	camel_map_store_get_map_session_path 	(CamelMapStore *map_store);
 gboolean	camel_map_store_get_initial_fetch 	(CamelMapStore *map_store);
 void		camel_map_store_set_initial_fetch 	(CamelMapStore *map_store, 
 							 gboolean fetch);
-
+gboolean	camel_map_store_update_inbox 		(CamelMapStore *map_store,
+							 GCancellable *cancellable,
+							 GError **error);
 G_END_DECLS
 
 #endif /* CAMEL_MAP_STORE_H */

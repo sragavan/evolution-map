@@ -708,8 +708,26 @@ map_refresh_info_sync (CamelFolder *folder,
 
 	priv->refreshing = TRUE;
 	g_mutex_unlock (priv->state_lock);
+	
+	camel_map_store_folder_lock (map_store);	
 
-	camel_map_store_folder_lock (map_store);
+	if (!camel_map_store_update_inbox (map_store, cancellable, error)) {
+		if (!error || g_strstr_len((*error)->message, -1, "0x51") == 0) {
+			camel_map_store_folder_unlock (map_store);
+			g_mutex_lock (priv->state_lock);
+			priv->refreshing = FALSE;
+			g_mutex_unlock (priv->state_lock);
+			printf("FAILED UP in UPDATE INBOX: %s %x\n", (*error)->message, (*error)->code);
+			return FALSE;
+		} else {
+			printf("Update INBOX not implemented by the device\n");
+			g_error_free (*error);
+			*error = NULL;
+		}
+	} else
+		printf("Successfully issued UpdateINBOX\n");
+
+
 	if (!camel_map_store_set_current_folder (map_store, "/telecom/msg", cancellable, error)) {
 		camel_map_store_folder_unlock (map_store);
 		g_mutex_lock (priv->state_lock);

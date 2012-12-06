@@ -288,6 +288,9 @@ map_connect_sync (CamelService *service,
 		CAMEL_OFFLINE_STORE (map_store),
 		TRUE, cancellable, NULL);
 
+	/* Set Notification registration */
+	//camel_map_dbus_set_notification_registration (map_store->priv->map, TRUE,
+	//					      cancellable, error);
 	return success;
 }
 
@@ -299,6 +302,9 @@ map_disconnect_sync (CamelService *service,
 {
 	CamelMapStore *map_store = (CamelMapStore *) service;
 	CamelServiceClass *service_class;
+
+	//camel_map_dbus_set_notification_registration (map_store->priv->map, FALSE,
+	//					      cancellable, error);			
 
 	g_mutex_lock (map_store->priv->connection_lock);
 	g_object_unref (map_store->priv->session);
@@ -809,4 +815,15 @@ void
 camel_map_store_set_initial_fetch (CamelMapStore *map_store, gboolean fetch)
 {
 	map_store->priv->initial_fetch = fetch;
+}
+
+gboolean
+camel_map_store_update_inbox (CamelMapStore *map_store,
+			      GCancellable *cancellable,
+			      GError **error)
+{
+	/* Assumes, we hold the lock. */
+	return camel_map_dbus_update_inbox (map_store->priv->map,
+					    cancellable,
+					    error);
 }

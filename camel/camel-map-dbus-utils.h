@@ -40,5 +40,13 @@ gboolean		camel_map_dbus_set_message_deleted 	(GDBusProxy *object,
 								 GCancellable *cancellable,
 								 GError **error);
 
+gboolean		camel_map_dbus_update_inbox 		(GDBusProxy *proxy,
+                             					 GCancellable *cancellable,
+                             					 GError **error);
 
+gboolean		camel_map_dbus_set_notification_registration
+								(GDBusProxy *proxy,
+								 gboolean reg,
+								 GCancellable *cancellable,
+								 GError **error);
 #endif

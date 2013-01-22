@@ -267,8 +267,10 @@ camel_map_folder_get_message_from_cache (CamelMapFolder *map_folder,
 }
 
 static gboolean
-parse_xbt_message (const char *btmsg,
+parse_xbt_message (CamelFolder *folder,
+		   const char *btmsg,
 		   const char *cache_file,
+		   const char *uid,
 		   GError **error)
 {
 	char *bt_message = NULL;
@@ -283,8 +285,69 @@ parse_xbt_message (const char *btmsg,
 //	mime_message = bt_message;
 //	mime_message = g_strstr_len (bt_message, -1, "BEGIN:MSG");
 //	mime_message += strlen ("BEGIN:MSG")+1;
-	end = g_strstr_len (bt_message, -1, "END:MSG");
-	*end = '\0';
+	if (strstr(bt_message, "MIME-Version:") != 0) {
+		/* This is a email*/
+		end = g_strstr_len (bt_message, -1, "END:MSG");
+		*end = '\0';
+	} else {
+		/* This is a SMS.*/
+		CamelMessageInfoBase *info;
+		CamelMimeMessage *msg;
+		CamelInternetAddress *addr;
+		char *str;
+		char *begin, *end;
+		CamelStream *stream, *base_stream;
+		GByteArray *byte_array;
+		CamelDataWrapper *content;
+		char *from_line;
+		CamelMimeFilter *filter;
+		
+		info = (CamelMessageInfoBase *) camel_folder_summary_get (folder->summary, uid);
+		msg = camel_mime_message_new ();
+		camel_mime_message_set_subject (msg, info->subject);
+		addr = camel_internet_address_new ();
+		camel_address_decode (CAMEL_ADDRESS (addr), info->from);
+		camel_mime_message_set_from (msg, addr);
+		g_object_unref (addr);
+		camel_mime_message_set_date (msg, info->date_sent, 0);
+
+		str = g_strdup_printf("camel-%s-%ld-%s-%d", camel_folder_get_display_name(folder), info->date_sent, uid, g_random_int());
+		camel_mime_message_set_message_id (msg, str);
+		g_free (str);
+		
+		begin = g_strstr_len (bt_message, -1, "BEGIN:MSG");
+		begin += strlen ("BEGIN:MSG")+1;
+		end = g_strstr_len (bt_message, -1, "END:MSG");
+		*end = '\0';
+
+		camel_mime_part_set_content (CAMEL_MIME_PART (msg), begin, strlen (begin), "text/plain");
+		
+		byte_array = g_byte_array_new ();
+		base_stream = camel_stream_mem_new_with_byte_array (byte_array);
+		from_line = camel_mime_message_build_mbox_from (msg);
+		g_output_stream_write_all (
+			G_OUTPUT_STREAM (stream),
+			from_line, strlen (from_line), NULL,
+			NULL, NULL);
+
+		filter = camel_mime_filter_from_new ();
+		stream = camel_stream_filter_new (base_stream);
+		camel_stream_filter_add (CAMEL_STREAM_FILTER (stream), filter);
+
+		camel_data_wrapper_write_to_stream_sync (
+			CAMEL_DATA_WRAPPER (msg),
+			stream, NULL, NULL);
+
+		g_free (bt_message);
+		g_object_unref (filter);
+		g_object_unref (stream);
+
+		bt_message = g_strndup ((gchar *) byte_array->data, byte_array->len);
+		g_object_unref (base_stream);
+		g_object_unref (msg);
+		
+		
+	}
 
 	if (!g_file_set_contents (cache_file, bt_message, -1, error)) {
 		g_free (bt_message);
@@ -387,7 +450,7 @@ camel_map_folder_get_message (CamelFolder *folder,
 		goto exit;
 	}
 
-	if (!parse_xbt_message (mime_dir, cache_file, &local_error)) {
+	if (!parse_xbt_message (folder, mime_dir, cache_file, uid, &local_error)) {
 		g_propagate_error (error, local_error);
 		goto exit;
 	}
@@ -784,7 +847,7 @@ map_refresh_info_sync (CamelFolder *folder,
 			printf("Message: %s: %s \t\t %s\n", msg_obj, uid, g_variant_print (prop, TRUE));
 			g_hash_table_insert (all_msgs, uid, msg_obj);
 			
-			info = camel_folder_summary_get (folder->summary, uid);
+			info = (CamelMessageInfoBase *)camel_folder_summary_get (folder->summary, uid);
 			if (info) {
 				GVariant *item;
 				GVariant *value;

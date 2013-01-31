@@ -1,7 +1,11 @@
 NULL =
 
-SUBDIRS = utils camel configuration po
-DIST_SUBDIRS= utils camel configuration po
+if ENABLE_EPLUGIN
+CONF_DIR=configuration
+endif
+
+SUBDIRS = utils camel $(CONF_DIR) po
+DIST_SUBDIRS= utils camel $(CONF_DIR) po
 
 changelogs = \
 	ChangeLog \

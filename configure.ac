@@ -141,23 +141,26 @@ dnl ********************************
 PKG_CHECK_MODULES(LIBEDATASERVER, libedataserver-1.2 >= eds_minimum_version)
 PKG_CHECK_MODULES(LIBEDATASERVERUI, libedataserverui-3.0 >= eds_minimum_version)
 PKG_CHECK_MODULES(LIBEBACKEND, libebackend-1.2 >= eds_minimum_version)
-PKG_CHECK_MODULES(LIBEMAIL_ENGINE, libemail-engine >= eds_minimum_version)
 PKG_CHECK_MODULES(CAMEL, camel-1.2 >= eds_minimum_version)
+
 
 dnl ****************************
 dnl Check for evolution plugins 
 dnl ****************************
-PKG_CHECK_MODULES(EVOLUTION_PLUGIN, evolution-plugin-3.0 >= evo_minimum_version)
+AC_ARG_ENABLE([eplugin],
+	[AS_HELP_STRING([--enable-eplugin],
+	[enable Evolution plugin support (default=no)])],
+	[enable_eplugin=$enableval], [enable_eplugin=no])
+AC_MSG_CHECKING([if Evolution plugins is enabled])
+AC_MSG_RESULT([$enable_eplugin])
+if test "x$enable_eplugin" = xyes; then
 
-dnl ****************************
-dnl Check for evolution shell 
-dnl ****************************
-PKG_CHECK_MODULES(EVOLUTION_SHELL, evolution-shell-3.0 >= evo_minimum_version)
-
-dnl ****************************
-dnl Check for evolution mail
-dnl ****************************
-PKG_CHECK_MODULES(EVOLUTION_MAIL, evolution-mail-3.0 >= evo_minimum_version)
+	PKG_CHECK_MODULES(EVOLUTION_SHELL, evolution-shell-3.0 >= evo_minimum_version)
+	PKG_CHECK_MODULES(EVOLUTION_MAIL, evolution-mail-3.0 >= evo_minimum_version)
+	PKG_CHECK_MODULES(LIBEMAIL_ENGINE, libemail-engine >= eds_minimum_version)
+	PKG_CHECK_MODULES(EVOLUTION_PLUGIN, evolution-plugin-3.0 >= evo_minimum_version)
+fi
+AM_CONDITIONAL([ENABLE_EPLUGIN], [test "x$enable_eplugin" = xyes])
 
 dnl ****************************
 dnl Check for sqlite3 
@@ -179,11 +182,14 @@ AC_SUBST_FILE(EVO_PLUGIN_RULE)
 dnl *******************
 dnl Special directories
 dnl *******************
-errordir=`$PKG_CONFIG --variable=errordir evolution-plugin-3.0`
-AC_SUBST(errordir)
-
-plugindir=`$PKG_CONFIG --variable=plugindir evolution-plugin-3.0`
-AC_SUBST(plugindir)
+if test "x$enable_eplugin" = xyes; then
+	errordir=`$PKG_CONFIG --variable=errordir evolution-plugin-3.0`
+	AC_SUBST(errordir)
+	plugindir=`$PKG_CONFIG --variable=plugindir evolution-plugin-3.0`
+	AC_SUBST(plugindir)
+	evo_moduledir=`$PKG_CONFIG --variable=moduledir evolution-shell-3.0`
+	AC_SUBST(evo_moduledir)
+fi
 
 camel_providerdir=`$PKG_CONFIG --variable=camel_providerdir camel-1.2`
 AC_SUBST(camel_providerdir) 
@@ -200,8 +206,6 @@ AC_SUBST(edataserver_privincludedir)
 eds_moduledir=`$PKG_CONFIG --variable=moduledir libebackend-1.2`
 AC_SUBST(eds_moduledir)
 
-evo_moduledir=`$PKG_CONFIG --variable=moduledir evolution-shell-3.0`
-AC_SUBST(evo_moduledir)
 
 dnl *************
 dnl Gtk Doc stuff

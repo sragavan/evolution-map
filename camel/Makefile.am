@@ -37,6 +37,20 @@ libcamelmap_la_LIBADD = \
 libcamelmap_la_LDFLAGS = -avoid-version -module $(NO_UNDEFINED) \
 	$(NULL)
 
+noinst_PROGRAMS = camel-test
+
+camel_test_CPPFLAGS = \
+	$(AM_CPPFLAGS)					\
+	$(CAMEL_CFLAGS) 			\
+	$(LIBEDATASERVER_CFLAGS) 		
+
+camel_test_SOURCES = \
+	camel-test.c
+
+camel_test_LDADD = \
+	$(CAMEL_LIBS) 				\
+	$(LIBEDATASERVER_LIBS) 			
+
 EXTRA_DIST = libcamelmap.urls
 
 -include $(top_srcdir)/git.mk

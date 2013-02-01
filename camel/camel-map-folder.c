@@ -780,7 +780,8 @@ map_refresh_info_sync (CamelFolder *folder,
 			g_mutex_lock (priv->state_lock);
 			priv->refreshing = FALSE;
 			g_mutex_unlock (priv->state_lock);
-			printf("FAILED UP in UPDATE INBOX: %s %x\n", (*error)->message, (*error)->code);
+			if (error)
+				printf("FAILED UP in UPDATE INBOX: %s %x\n", (*error)->message, (*error)->code);
 			return FALSE;
 		} else {
 			printf("Update INBOX not implemented by the device\n");

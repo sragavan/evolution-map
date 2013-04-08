@@ -325,10 +325,7 @@ parse_xbt_message (CamelFolder *folder,
 		byte_array = g_byte_array_new ();
 		base_stream = camel_stream_mem_new_with_byte_array (byte_array);
 		from_line = camel_mime_message_build_mbox_from (msg);
-		g_output_stream_write_all (
-			G_OUTPUT_STREAM (stream),
-			from_line, strlen (from_line), NULL,
-			NULL, NULL);
+		camel_stream_write (base_stream, from_line, strlen (from_line), NULL, NULL);
 
 		filter = camel_mime_filter_from_new ();
 		stream = camel_stream_filter_new (base_stream);

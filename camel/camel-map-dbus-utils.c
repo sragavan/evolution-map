@@ -33,9 +33,9 @@ camel_map_connect_device_channel (GDBusConnection *connection,
 
 	str_channel = g_strdup_printf("%u", channel);
 
-	m = g_dbus_message_new_method_call ("org.bluez.obex.client", /* name */
-                                      "/", /* path */
-                                      "org.bluez.obex.Client", /* interface */
+	m = g_dbus_message_new_method_call ("org.bluez.obex", /* name */
+                                      "/org/bluez/obex", /* path */
+                                      "org.bluez.obex.Client1", /* interface */
                                       "CreateSession");
 
 
@@ -76,31 +76,42 @@ typedef struct _transfer_handler {
     GVariant *result;
 }TransferHandler;
 
-static void
-transfer_on_signal (GDBusProxy  *proxy,
-		     const gchar *sender_name,
-		     const gchar *signal_name,
-		     GVariant    *parameters,
-		     gpointer     user_data)
+static void 
+transfer_on_signal (GDBusProxy *proxy,
+		    GVariant   *changed_properties,
+		    GStrv       invalidated_properties,
+		    gpointer    user_data)
 {
     TransferHandler *handler = (TransferHandler *)user_data;
-    
-    printf("Signal:*****************************8 %s\n", signal_name);
-    printf("%s\n", g_variant_print (parameters, TRUE));
+    GVariantIter iter;
+    GVariant *value;
+    gchar *key;
+    guint i;
 
-    if (g_ascii_strcasecmp (signal_name, "error") == 0) {
-	handler->result = g_variant_ref (parameters);
-	handler->complete = TRUE;
-	handler->error = TRUE;
-	printf("Launching cond signal handler after error\n");
-	g_cond_signal (&handler->cond);
-    } else if (g_ascii_strcasecmp (signal_name, "complete") == 0) {
-	handler->result = g_variant_ref (parameters);
-	handler->complete = TRUE;
-	handler->error = FALSE;
-	printf("Launching cond signal handler after complete\n");
-	g_cond_signal (&handler->cond);
+
+    printf("%s\n", g_variant_print (changed_properties, TRUE));
+    g_variant_iter_init (&iter, changed_properties);
+    
+    while (g_variant_iter_next (&iter, "{sv}", &key, &value)) {
+		if (g_ascii_strcasecmp (key, "Status") == 0) {
+			const char *status = g_variant_get_string (value, NULL);
+
+			if (g_ascii_strcasecmp (status, "error") == 0) {
+				handler->complete = TRUE;
+				handler->error = TRUE;
+				printf("Launching cond signal handler after error\n");
+				g_cond_signal (&handler->cond);
+			} else if (g_ascii_strcasecmp (status, "complete") == 0) {
+				handler->complete = TRUE;
+				handler->error = FALSE;
+				printf("Launching cond signal handler after complete\n");
+				g_cond_signal (&handler->cond);
+			}
+		}
+	    g_free (key);
+	    g_variant_unref (value);
     }
+
 }
 
 gboolean
@@ -123,9 +134,9 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
 					G_DBUS_PROXY_FLAGS_NONE,
 					NULL,
-					"org.bluez.obex.client",
+					"org.bluez.obex",
 					message_object_id,
-					"org.bluez.obex.Message",
+					"org.bluez.obex.Message1",
 					cancellable,
 					error);
 
@@ -152,18 +163,10 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	/* Get the transfer object (oa{sv}) */
 	
 	g_variant_iter_init (&top_iter, ret);
-	item = g_variant_iter_next_value (&top_iter);
-	g_variant_get (item, "(&o@a{sv})", &transfer_obj, &prop);
-	g_object_unref (prop);
-
-	transfer = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.bluez.obex.client",
-					transfer_obj,
-					"org.bluez.obex.Transfer",
-					cancellable,
-					error);
+	//item = g_variant_iter_next_value (&top_iter);
+	g_variant_get (ret, "(&o@a{sv})", &transfer_obj, &prop);
+	printf("TRA: %s\n", transfer_obj);
+	//g_object_unref (prop);
 
 	/* Co-ordinate with Transfer handler and return synchronously */
 	handler = g_new0 (TransferHandler, 1);
@@ -175,10 +178,16 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	g_mutex_lock (&handler->lock);
 	/* We would kinda wait 2 mins */
 	end_time = g_get_monotonic_time () + 120 * G_TIME_SPAN_SECOND;
-	g_signal_connect (transfer,
-			  "g-signal",
-			  G_CALLBACK (transfer_on_signal),
-			  handler);
+	transfer = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.bluez.obex",
+					transfer_obj,
+					"org.bluez.obex.Transfer1",
+					cancellable,
+					error);
+
+	g_signal_connect (transfer, "g-properties-changed", G_CALLBACK (transfer_on_signal), handler);
 
 	while (!handler->complete) {
 	    printf("going to wait\n");
@@ -191,7 +200,6 @@ camel_map_dbus_get_message (GDBusProxy *object,
 	printf("Awake\n");
 	g_mutex_clear (&handler->lock);
 	g_cond_clear (&handler->cond);
-	g_variant_unref (handler->result);
 	success = handler->error != TRUE;
 	g_free (handler);
 	
@@ -215,9 +223,9 @@ camel_map_dbus_set_message_read (GDBusProxy *object,
     message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
 				     G_DBUS_PROXY_FLAGS_NONE,
 				     NULL,
-				     "org.bluez.obex.client",
+				     "org.bluez.obex",
 				     msg_id,
-				     "org.bluez.obex.Message",
+				     "org.bluez.obex.Message1",
 				     cancellable,
 				     &lerr);
     if (!message) {
@@ -250,9 +258,9 @@ camel_map_dbus_set_message_deleted (GDBusProxy *object,
     message = g_dbus_proxy_new_sync (g_dbus_proxy_get_connection(object),
 				     G_DBUS_PROXY_FLAGS_NONE,
 				     NULL,
-				     "org.bluez.obex.client",
+				     "org.bluez.obex",
 				     msg_id,
-				     "org.bluez.obex.Message",
+				     "org.bluez.obex.Message1",
 				     cancellable,
 				     error);
     if (!message)

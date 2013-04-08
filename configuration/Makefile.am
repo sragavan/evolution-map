@@ -6,6 +6,7 @@ module_map_configuration_la_CPPFLAGS = \
 	$(AM_CPPFLAGS) \
 	-I$(top_srcdir) \
 	-I$(top_srcdir)/utils \
+	$(BLUEZ_CFLAGS)		\
 	$(EVOLUTION_MAIL_CFLAGS) \
 	$(EVOLUTION_SHELL_CFLAGS) \
 	$(NULL)
@@ -21,6 +22,7 @@ module_map_configuration_la_SOURCES = 	\
 
 module_map_configuration_la_LIBADD = \
 	$(top_srcdir)/utils/libmaputils.la	\
+	$(BLUEZ_LIBS)				\
 	$(EVOLUTION_MAIL_LIBS) 			\
 	$(EVOLUTION_SHELL_LIBS) 		\
 	$(NULL)

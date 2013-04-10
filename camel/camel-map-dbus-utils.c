@@ -225,7 +225,7 @@ camel_map_dbus_set_message_read (GDBusProxy *object,
 				     NULL,
 				     "org.bluez.obex",
 				     msg_id,
-				     "org.bluez.obex.Message1",
+				     "org.freedesktop.DBus.Properties",
 				     cancellable,
 				     &lerr);
     if (!message) {
@@ -235,8 +235,8 @@ camel_map_dbus_set_message_read (GDBusProxy *object,
     
     printf("Setprop \n");
     ret = g_dbus_proxy_call_sync (message,
-				  "SetProperty",
-				  g_variant_new ("(sv)", "Read", g_variant_new_boolean(read)),
+				  "org.freedesktop.DBus.Properties.Set",
+				  g_variant_new ("(ssv)", "org.bluez.obex.Message1", "Read", g_variant_new_boolean(read)),
 				  G_DBUS_CALL_FLAGS_NONE,
 				  -1,
 				  cancellable,
@@ -260,15 +260,15 @@ camel_map_dbus_set_message_deleted (GDBusProxy *object,
 				     NULL,
 				     "org.bluez.obex",
 				     msg_id,
-				     "org.bluez.obex.Message1",
+				     "org.freedesktop.DBus.Properties",
 				     cancellable,
 				     error);
     if (!message)
 	return FALSE;
     
     ret = g_dbus_proxy_call_sync (message,
-				  "SetProperty",
-				  g_variant_new ("(sv)", "Deleted", g_variant_new_boolean(deleted)),
+				  "org.freedesktop.DBus.Properties.Set",
+				  g_variant_new ("(ssv)", "org.bluez.obex.Message1", "Deleted", g_variant_new_boolean(deleted)),
 				  G_DBUS_CALL_FLAGS_NONE,
 				  -1,
 				  cancellable,
